@@ -13,7 +13,7 @@ audio_path = os.path.join(meg_path, 'collect_data/audio')
 megsp_list = os.listdir(megsp_path)
 audio_list = os.listdir(audio_path)
 
-select_subj = "04"   # no 03, until 06 included
+select_subj = "06"   # no 03, until 06 included
 print('NUM_SUBJECT: ', select_subj)
 megsp_list_session_0 = [f for f in megsp_list if f.startswith(select_subj) and f.split('_')[1] == '0']
 megsp_list_session_1 = [f for f in megsp_list if f.startswith(select_subj) and f.split('_')[1] == '1']
@@ -37,7 +37,7 @@ print('DIMENSION_MEG_TENSOR_TEST: ', meg_tensor_test.shape)
 
 if torch.cuda.is_available():
     # Set the CUDA device (assuming you have a GPU with device index 0)
-    torch.cuda.set_device(3)
+    torch.cuda.set_device(4)
     # Now, any PyTorch tensors or models you create will be allocated on GPU 0
     # Example:
     tensor_on_gpu = torch.tensor([1, 2, 3]).cuda()
@@ -61,7 +61,7 @@ for channel in tqdm(range(num_channel)):    # 10 canali --> tempo +/- 12 minuti
     real_target.append(y_test)
     mse_scores.append(mse)
 
-save_pred_target = os.path.join(meg_path, 'collect_data/results_02/meg_prediction_ridge_02.pt')
+save_pred_target = os.path.join(meg_path, 'collect_data/results_06/meg_prediction_ridge_06.pt')
 torch.save(torch.tensor(pred_target), save_pred_target)
-save_mse = os.path.join(meg_path, 'collect_data/results_02/meg_mse_ridge_02.pt')
+save_mse = os.path.join(meg_path, 'collect_data/results_06/meg_mse_ridge_06.pt')
 torch.save(torch.tensor(mse_scores), save_mse)

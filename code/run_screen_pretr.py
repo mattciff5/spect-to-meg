@@ -26,7 +26,7 @@ from sklearn.linear_model import Ridge
 
 
 stimuli_feature = "audio"    # audio or text
-subjects = ['02', '04', '05', '06']
+subjects = ['10', '11']
 tasks_with_sound_ids = {
             'lw1': lw1,
             'cable_spool_fort': cable_spool_fort,

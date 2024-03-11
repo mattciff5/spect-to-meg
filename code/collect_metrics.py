@@ -5,9 +5,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch 
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from scipy.stats import entropy
+from scipy.stats import pearsonr
 from collect_data import num_channel
 
+freq_bands = {
+    'delta': [0, 2],
+    'theta': [2, 4],
+    'alpha': [4, 7],
+    'beta': [7, 16],
+}
 
 def get_correlation(meg_tensor_test, pred_meg_y):
     real_target = []
@@ -17,7 +23,8 @@ def get_correlation(meg_tensor_test, pred_meg_y):
     pred_meg_y = pred_meg_y.permute(1, 0, 2)
     real_target = torch.tensor(np.array(real_target))
     real_target = real_target.permute(1, 0, 2)
-    correlations = np.array([np.corrcoef(real_target[:,i], pred_meg_y[:,i])[0, 1] for i in range(num_channel)])
+    correlations = np.array([np.corrcoef(real_target[:,i].reshape(-1), pred_meg_y[:,i].reshape(-1))[0, 1] 
+                             for i in range(num_channel)])
     return pred_meg_y, real_target, correlations
 
 
@@ -79,12 +86,12 @@ def bands_metrics(real_target, pred_meg_y, freq_bands):
             real_band_data = real_band_data.reshape(real_band_data.shape[0], real_band_data.shape[1], -1)
             pred_band_data = pred_band_data.reshape(pred_band_data.shape[0], pred_band_data.shape[1], -1)
 
-            pearson_corr = np.corrcoef(real_band_data[:,i], pred_band_data[:,i])[0, 1]
+            pearson_corr = np.corrcoef(real_band_data[:,i,:].reshape(-1), pred_band_data[:,i,:].reshape(-1))[0,1]
             modified_r2 = np.abs(pearson_corr) * pearson_corr
-            r2 = r2_score(real_band_data[:,i], pred_band_data[:,i])
-            mse = mean_squared_error(real_band_data[:,i], pred_band_data[:,i])
-            mae = mean_absolute_error(real_band_data[:,i], pred_band_data[:,i])
-            mae_norm = mae/abs(pred_band_data[:,i].mean())
+            r2 = r2_score(real_band_data[:,i,:], pred_band_data[:,i,:])
+            mse = mean_squared_error(real_band_data[:,i,:], pred_band_data[:,i,:])
+            mae = mean_absolute_error(real_band_data[:,i,:], pred_band_data[:,i,:])
+            mae_norm = float(mae/abs(pred_band_data[:,i,:].mean()))
 
             metrics_by_band.setdefault(band_name, []).append({
                 'channel': i,

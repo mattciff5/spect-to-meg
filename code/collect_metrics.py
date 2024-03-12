@@ -88,7 +88,6 @@ def bands_metrics(real_target, pred_meg_y, freq_bands):
 
             pearson_corr = np.corrcoef(real_band_data[:,i,:].reshape(-1), pred_band_data[:,i,:].reshape(-1))[0,1]
             modified_r2 = np.abs(pearson_corr) * pearson_corr
-            r2 = r2_score(real_band_data[:,i,:], pred_band_data[:,i,:])
             mse = mean_squared_error(real_band_data[:,i,:], pred_band_data[:,i,:])
             mae = mean_absolute_error(real_band_data[:,i,:], pred_band_data[:,i,:])
             mae_norm = float(mae/abs(pred_band_data[:,i,:].mean()))
@@ -96,7 +95,6 @@ def bands_metrics(real_target, pred_meg_y, freq_bands):
             metrics_by_band.setdefault(band_name, []).append({
                 'channel': i,
                 'pearson_corr': pearson_corr,
-                'scikit_r2': r2,
                 'modified_r2': modified_r2,
                 'mse': mse,
                 'mae': mae,

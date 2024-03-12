@@ -41,21 +41,24 @@ for select_subj in subjects:
 
     pred_target = []
     cv_scores = []
-    real_target = []
+    cv_alphas = []
     audio_train = audio_tensor_train.reshape(audio_tensor_train.shape[0], -1)
     audio_test = audio_tensor_test.reshape(audio_tensor_test.shape[0], -1)
     for channel in tqdm(range(num_channel)):    # 10 canali --> tempo +/- 12 minuti
         y_train = meg_tensor_train[:, channel, :, :].reshape(meg_tensor_train.shape[0], -1)
         y_test = meg_tensor_test[:, channel, :, :].reshape(meg_tensor_test.shape[0], -1)
-        model_cv = RidgeCV(alphas=[1, 10, 500, 5000])
+        model_cv = RidgeCV(alphas=[10, 500, 5000, 10000], scoring='r2')
         model_cv.fit(audio_train, y_train)
         score = model_cv.score(audio_train, y_train)
         y_pred = model_cv.predict(audio_test)
         pred_target.append(y_pred)
-        real_target.append(y_test)
         cv_scores.append(score)
+        cv_alphas.append(model_cv.alpha_)
+
 
     save_pred_target = os.path.join(meg_path, 'collect_data/results_'+select_subj+'/meg_prediction_ridgeCV_'+select_subj+'.pt')
     torch.save(torch.tensor(pred_target), save_pred_target)
-    save_mse = os.path.join(meg_path, 'collect_data/results_'+select_subj+'/meg_mse_ridgeCV_'+select_subj+'.pt')
+    save_mse = os.path.join(meg_path, 'collect_data/results_'+select_subj+'/meg_score_ridgeCV_'+select_subj+'.pt')
     torch.save(torch.tensor(cv_scores), save_mse)
+    save_alphas = os.path.join(meg_path, 'collect_data/results_'+select_subj+'/meg_alphas_ridgeCV_'+select_subj+'.pt')
+    torch.save(torch.tensor(cv_alphas), save_alphas)

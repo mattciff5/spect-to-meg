@@ -13,7 +13,7 @@ audio_path = os.path.join(meg_path, 'collect_data/audio')
 megsp_list = os.listdir(megsp_path)
 audio_list = os.listdir(audio_path)
 
-subjects = ['01']
+subjects = patient
 for select_subj in subjects:
     print('NUM_SUBJECT: ', select_subj)
     megsp_list_session_0 = [f for f in megsp_list if f.startswith(select_subj) and f.split('_')[1] == '0']
@@ -47,7 +47,7 @@ for select_subj in subjects:
     for channel in tqdm(range(num_channel)):    # 10 canali --> tempo +/- 12 minuti
         y_train = meg_tensor_train[:, channel, :, :].reshape(meg_tensor_train.shape[0], -1)
         y_test = meg_tensor_test[:, channel, :, :].reshape(meg_tensor_test.shape[0], -1)
-        model_cv = RidgeCV(alphas=[10, 500, 5000, 10000], scoring='r2')
+        model_cv = RidgeCV(alphas=[1, 10, 500, 5000])
         model_cv.fit(audio_train, y_train)
         score = model_cv.score(audio_train, y_train)
         y_pred = model_cv.predict(audio_test)

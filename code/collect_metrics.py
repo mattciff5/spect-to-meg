@@ -9,6 +9,7 @@ from scipy.stats import pearsonr
 from collect_data import num_channel
 
 freq_bands = {
+    'complete': [0, 16],
     'delta': [0, 2],
     'theta': [2, 4],
     'alpha': [4, 7],
@@ -77,7 +78,6 @@ def bands_metrics(real_target, pred_meg_y, freq_bands):
     metrics_by_band = {}
 
     for band_name, band_range in freq_bands.items():
-        band_corr_values = []
         
         for i in range(num_channel):
             real_band_data = real_target[:, :, band_range[0]:band_range[1], :]

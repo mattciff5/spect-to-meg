@@ -157,7 +157,7 @@ def get_audio_deep_spectrogram(audio_path, epochs, set_extraction='mel', n_mels=
             # extract MEL spectrogram
             mel_spectrogram = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft, 
                                                             hop_length=hop_length, n_mels=n_mels)
-            spectrogram_db = librosa.amplitude_to_db(mel_spectrogram, ref=np.max)
+            spectrogram_db = librosa.amplitude_to_db(mel_spectrogram, ref=np.min)
             if (spectrogram_db.shape[1] < n_frames):
                 # Make padding
                 pad_width = n_frames - spectrogram_db.shape[1]

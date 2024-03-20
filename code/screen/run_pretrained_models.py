@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, cohen_kappa_score
 from sklearn.linear_model import LogisticRegression
@@ -17,7 +20,6 @@ from mne.decoding import (
     cross_val_multiscore,
     get_coef,
 )
-import pickle
 import torch
 from datasets import load_dataset
 from collect_data import *
@@ -25,8 +27,8 @@ from collect_metrics import *
 from sklearn.linear_model import Ridge
 
 
-stimuli_feature = "audio"    # audio or text
-subjects = ['10', '11']
+stimuli_feature = "text"    # audio or text
+subjects = ['02', '04', '05', '06', '08', '09', '10', '11']
 tasks_with_sound_ids = {
             'lw1': lw1,
             'cable_spool_fort': cable_spool_fort,
@@ -45,21 +47,13 @@ print('WAVE FILES DURATION: ',wav_files_duration)
 print('WAVE FILES WITH\ NUMBERS: ',task)
 wav_list_without_numb = list(task.keys())
 
-if torch.cuda.is_available():
-    # Set the CUDA device (assuming you have a GPU with device index 0)
-    torch.cuda.set_device(4)
-    # Now, any PyTorch tensors or models you create will be allocated on GPU 0
-    # Example:
-    tensor_on_gpu = torch.tensor([1, 2, 3]).cuda()
-    print("Tensor on GPU:", tensor_on_gpu)
-else:
-    print("CUDA is not available. Running on CPU.")
-
+device = torch.device("cuda:{}".format(1) if torch.cuda.is_available() else "cpu")
+print("DEVICE", device)
 
 if stimuli_feature == "text":
     print('STIMULI_FEATURES: ', stimuli_feature)
     for subject in subjects:
-        # no 03, until 06 included
+        # no 03
         epochs_list = []
         for sess in tqdm(session):
             print('---------', str(sess), '----------')
@@ -127,14 +121,27 @@ if stimuli_feature == "text":
         y_valid = concat_epochs_valid.metadata.word.to_numpy()
         X_sent_valid, y_sent_valid = build_phrase_dataset(X_valid, y_valid)
 
-        tokenizer_gpt = AutoTokenizer.from_pretrained("gpt2")
-        model_gpt = GPT2Model.from_pretrained("gpt2")
-        tokenizer_gpt.pad_token = tokenizer_gpt.eos_token
-        inputs_gpt_tr = tokenizer_gpt(list(y_sent_train), padding=True, return_tensors="pt")
-        outputs_tr = model_gpt(**inputs_gpt_tr)
+        """
+        #GPT2
+        model = GPT2Model.from_pretrained("gpt2")
+        tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        tokenizer.pad_token = tokenizer.eos_token
+        inputs_tr = tokenizer(list(y_sent_train), padding=True, return_tensors="pt")
+        outputs_tr = model(**inputs_tr)
         last_hidden_states_tr = outputs_tr.last_hidden_state
-        inputs_gpt_test = tokenizer_gpt(list(y_sent_test), padding=True, return_tensors="pt")
-        outputs_test = model_gpt(**inputs_gpt_test)
+        inputs_test = tokenizer(list(y_sent_test), padding=True, return_tensors="pt")
+        outputs_test = model(**inputs_test)
+        last_hidden_states_test = outputs_test.last_hidden_state
+        """
+
+        #CLIP
+        model = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32")
+        tokenizer = AutoTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+        inputs_tr = tokenizer(list(y_sent_train), padding=True, return_tensors="pt")
+        outputs_tr = model(**inputs_tr)
+        last_hidden_states_tr = outputs_tr.last_hidden_state
+        inputs_test = tokenizer(list(y_sent_test), padding=True, return_tensors="pt")
+        outputs_test = model(inputs_test.input_ids[:,0:-1], inputs_test.attention_mask[:,0:-1])
         last_hidden_states_test = outputs_test.last_hidden_state
 
         megsp_path = os.path.join(meg_path, 'collect_data/megsp')
@@ -151,9 +158,9 @@ if stimuli_feature == "text":
         print('DIMENSION_MEG_TENSOR_VALID: ', meg_tensor_valid.shape)
         print('DIMENSION_MEG_TENSOR_TEST: ', meg_tensor_test.shape)
 
-        print('inputs_gpt_tr.input_ids.shape --> train: ', inputs_gpt_tr.input_ids.shape)
+        print('inputs_tr.input_ids.shape --> train: ', inputs_tr.input_ids.shape)
         print('last_hidden_states_tr.shape --> train: ', last_hidden_states_tr.shape)
-        print('inputs_gpt_test.input_ids.shape --> test: ', inputs_gpt_test.input_ids.shape)
+        print('inputs_test.input_ids.shape --> test: ', inputs_test.input_ids.shape)
         print('last_hidden_states_test.shape --> test: ', last_hidden_states_test.shape)
         meg_tensor_train = meg_tensor_train[19:-1]
         meg_tensor_test = meg_tensor_test[19:-1]
@@ -178,9 +185,9 @@ if stimuli_feature == "text":
             real_target_text.append(y_test)
             mse_scores_text.append(mse)
 
-        save_pred_target = os.path.join(meg_path, 'collect_data/results_'+subject+'/meg_prediction_ridge_text_gpt_'+subject+'.pt')
+        save_pred_target = os.path.join(meg_path, 'collect_data/results_'+subject+'/meg_prediction_ridge_text_clip_'+subject+'.pt')
         torch.save(torch.tensor(pred_target_text), save_pred_target)
-        save_mse = os.path.join(meg_path, 'collect_data/results_'+subject+'/meg_mse_ridge_text_gpt_'+subject+'.pt')
+        save_mse = os.path.join(meg_path, 'collect_data/results_'+subject+'/meg_mse_ridge_text_clip_'+subject+'.pt')
         torch.save(torch.tensor(mse_scores_text), save_mse)
 
 else: 

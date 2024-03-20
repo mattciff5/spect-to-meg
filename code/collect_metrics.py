@@ -7,6 +7,8 @@ import torch
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from scipy.stats import pearsonr
 from collect_data import num_channel
+import multiprocessing
+import tqdm
 
 freq_bands = {
     'complete': [0, 16],
@@ -74,6 +76,62 @@ def kld_compute(q: torch.Tensor, p_prior: torch.Tensor) -> torch.Tensor:
     return kld
 
 
+def bands_metrics_right(real_target, pred_meg_y, freq_bands):
+    metrics_by_band = {}
+
+    for band_name, band_range in freq_bands.items():
+        
+        for i in range(num_channel):
+            real_band_data = real_target[:, :, band_range[0]:band_range[1], :]
+            pred_band_data = pred_meg_y[:, :, band_range[0]:band_range[1], :]
+
+            real_band_data = real_band_data.reshape(real_band_data.shape[0], real_band_data.shape[1], -1)
+            pred_band_data = pred_band_data.reshape(pred_band_data.shape[0], pred_band_data.shape[1], -1)
+
+            list_pearson = []
+            list_mod_r2 = []
+            list_mse = []
+            list_mae = []
+            list_mae_norm = []
+            # for j in range(pred_band_data.shape[-1]):
+                
+            #     pearson_corr = np.corrcoef(real_band_data[:,i,j], pred_band_data[:,i,j])[0,1]
+            #     # print(real_band_data[:,i,:].reshape(-1).shape)
+            #     # print(pred_band_data[:,i,:].reshape(-1).shape)
+            #     modified_r2 = np.abs(pearson_corr) * pearson_corr
+            #     mse = mean_squared_error(real_band_data[:,i,j], pred_band_data[:,i,j])
+            #     mae = mean_absolute_error(real_band_data[:,i,j], pred_band_data[:,i,j])
+            #     mae_norm = float(mae/abs(pred_band_data[:,i,j].mean()))
+            #     list_pearson.append(pearson_corr)
+            #     list_mod_r2.append(modified_r2)
+            #     list_mse.append(mse)
+            #     list_mae.append(mae)
+            #     list_mae_norm.append(mae_norm)
+            for j in tqdm.trange(pred_band_data.shape[0]):
+                pearson_corr = np.corrcoef(real_band_data[j,i], pred_band_data[j,i])[0,1]
+                modified_r2 = np.abs(pearson_corr) * pearson_corr
+                mse = mean_squared_error(real_band_data[j,i], pred_band_data[j,i])
+                mae = mean_absolute_error(real_band_data[j,i], pred_band_data[j,i])
+                mae_norm = float(mae/abs(pred_band_data[j,i].mean()))
+                list_pearson.append(pearson_corr)
+                list_mod_r2.append(modified_r2)
+                list_mse.append(mse)
+                list_mae.append(mae)
+                list_mae_norm.append(mae_norm)
+
+
+
+            metrics_by_band.setdefault(band_name, []).append({
+                'channel': i,
+                'pearson_corr': np.mean(list_pearson),
+                'modified_r2': np.mean(list_mod_r2),
+                'mse': np.mean(list_mse),
+                'mae': np.mean(list_mae),
+                'mae_norm': np.mean(list_mae_norm),
+            })
+
+    return metrics_by_band
+
 def bands_metrics(real_target, pred_meg_y, freq_bands):
     metrics_by_band = {}
 
@@ -86,11 +144,11 @@ def bands_metrics(real_target, pred_meg_y, freq_bands):
             real_band_data = real_band_data.reshape(real_band_data.shape[0], real_band_data.shape[1], -1)
             pred_band_data = pred_band_data.reshape(pred_band_data.shape[0], pred_band_data.shape[1], -1)
 
-            pearson_corr = np.corrcoef(real_band_data[:,i,:].reshape(-1), pred_band_data[:,i,:].reshape(-1))[0,1]
+            pearson_corr = np.corrcoef(real_band_data[:,i].reshape(-1), pred_band_data[:,i].reshape(-1))[0,1]
             modified_r2 = np.abs(pearson_corr) * pearson_corr
-            mse = mean_squared_error(real_band_data[:,i,:], pred_band_data[:,i,:])
-            mae = mean_absolute_error(real_band_data[:,i,:], pred_band_data[:,i,:])
-            mae_norm = float(mae/abs(pred_band_data[:,i,:].mean()))
+            mse = mean_squared_error(real_band_data[:,i], pred_band_data[:,i])
+            mae = mean_absolute_error(real_band_data[:,i], pred_band_data[:,i])
+            mae_norm = float(mae/abs(pred_band_data[:,i].mean()))
 
             metrics_by_band.setdefault(band_name, []).append({
                 'channel': i,
@@ -127,5 +185,58 @@ def get_kullback_vect(pred_meg_y, real_target):
     
     return kld_vector
 
+
+
+# ----------------------- PROVA CON MULTI CPU -------------------------
+
+def compute_band_metrics(real_band_data, pred_band_data, i):
+    pearson_corr = np.corrcoef(real_band_data[:,i,:].reshape(-1), pred_band_data[:,i,:].reshape(-1))[0,1]
+    modified_r2 = np.abs(pearson_corr) * pearson_corr
+    mse = mean_squared_error(real_band_data[:,i,:], pred_band_data[:,i,:])
+    mae = mean_absolute_error(real_band_data[:,i,:], pred_band_data[:,i,:])
+    mae_norm = float(mae/abs(pred_band_data[:,i,:].mean()))
+
+    return {
+        'channel': i,
+        'pearson_corr': pearson_corr,
+        'modified_r2': modified_r2,
+        'mse': mse,
+        'mae': mae,
+        'mae_norm': mae_norm,
+    }
+
+def bands_metrics_cpu(real_target, pred_meg_y, freq_bands):
+    metrics_by_band = {}
+
+    num_channel = real_target.shape[1]
+
+    def process_band(band_name, band_range):
+        results = []
+        for i in range(num_channel):
+            real_band_data = real_target[:, i, band_range[0]:band_range[1], :]
+            pred_band_data = pred_meg_y[:, i, band_range[0]:band_range[1], :]
+
+            real_band_data = real_band_data.reshape(real_band_data.shape[0], -1)
+            pred_band_data = pred_band_data.reshape(pred_band_data.shape[0], -1)
+
+            results.append(compute_band_metrics(real_band_data, pred_band_data, i))
+        return results
+
+    if __name__ == "__main__":
+        # Create a pool of processes
+        pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+
+        # Apply the function to each frequency band in parallel
+        results = pool.starmap(process_band, freq_bands.items())
+
+        # Close the pool of processes
+        pool.close()
+        pool.join()
+
+        # Aggregate results by band
+        for idx, (band_name, _) in enumerate(freq_bands.items()):
+            metrics_by_band[band_name] = results[idx]
+
+    return metrics_by_band
 
 

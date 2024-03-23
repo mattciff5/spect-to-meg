@@ -5,17 +5,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch 
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from skimage.metrics import normalized_mutual_information, structural_similarity
 from scipy.stats import pearsonr
 from collect_data import num_channel
 import multiprocessing
 import tqdm
+import time
+from joblib import Parallel, delayed
 
-freq_bands = {
+
+freq_bands_tot = {
     'complete': [0, 16],
     'delta': [0, 2],
     'theta': [2, 4],
     'alpha': [4, 7],
     'beta': [7, 16],
+}
+
+freq_bands = {
+    'complete': [0, 16]
 }
 
 def get_correlation(meg_tensor_test, pred_meg_y):
@@ -76,87 +84,45 @@ def kld_compute(q: torch.Tensor, p_prior: torch.Tensor) -> torch.Tensor:
     return kld
 
 
-def bands_metrics_right(real_target, pred_meg_y, freq_bands):
+
+def bands_metrics(real_target, pred_meg_y, freq_bands, nmi_compute=False):
     metrics_by_band = {}
 
     for band_name, band_range in freq_bands.items():
         
-        for i in range(num_channel):
+        for channel in tqdm.trange(num_channel):
             real_band_data = real_target[:, :, band_range[0]:band_range[1], :]
             pred_band_data = pred_meg_y[:, :, band_range[0]:band_range[1], :]
 
-            real_band_data = real_band_data.reshape(real_band_data.shape[0], real_band_data.shape[1], -1)
-            pred_band_data = pred_band_data.reshape(pred_band_data.shape[0], pred_band_data.shape[1], -1)
+            real_band_data_resh = real_band_data.reshape(real_band_data.shape[0], real_band_data.shape[1], -1)
+            pred_band_data_resh = pred_band_data.reshape(pred_band_data.shape[0], pred_band_data.shape[1], -1)
 
-            list_pearson = []
-            list_mod_r2 = []
-            list_mse = []
-            list_mae = []
-            list_mae_norm = []
-            # for j in range(pred_band_data.shape[-1]):
-                
-            #     pearson_corr = np.corrcoef(real_band_data[:,i,j], pred_band_data[:,i,j])[0,1]
-            #     # print(real_band_data[:,i,:].reshape(-1).shape)
-            #     # print(pred_band_data[:,i,:].reshape(-1).shape)
-            #     modified_r2 = np.abs(pearson_corr) * pearson_corr
-            #     mse = mean_squared_error(real_band_data[:,i,j], pred_band_data[:,i,j])
-            #     mae = mean_absolute_error(real_band_data[:,i,j], pred_band_data[:,i,j])
-            #     mae_norm = float(mae/abs(pred_band_data[:,i,j].mean()))
-            #     list_pearson.append(pearson_corr)
-            #     list_mod_r2.append(modified_r2)
-            #     list_mse.append(mse)
-            #     list_mae.append(mae)
-            #     list_mae_norm.append(mae_norm)
-            for j in tqdm.trange(pred_band_data.shape[0]):
-                pearson_corr = np.corrcoef(real_band_data[j,i], pred_band_data[j,i])[0,1]
-                modified_r2 = np.abs(pearson_corr) * pearson_corr
-                mse = mean_squared_error(real_band_data[j,i], pred_band_data[j,i])
-                mae = mean_absolute_error(real_band_data[j,i], pred_band_data[j,i])
-                mae_norm = float(mae/abs(pred_band_data[j,i].mean()))
-                list_pearson.append(pearson_corr)
-                list_mod_r2.append(modified_r2)
-                list_mse.append(mse)
-                list_mae.append(mae)
-                list_mae_norm.append(mae_norm)
-
-
-
-            metrics_by_band.setdefault(band_name, []).append({
-                'channel': i,
-                'pearson_corr': np.mean(list_pearson),
-                'modified_r2': np.mean(list_mod_r2),
-                'mse': np.mean(list_mse),
-                'mae': np.mean(list_mae),
-                'mae_norm': np.mean(list_mae_norm),
-            })
-
-    return metrics_by_band
-
-def bands_metrics(real_target, pred_meg_y, freq_bands):
-    metrics_by_band = {}
-
-    for band_name, band_range in freq_bands.items():
-        
-        for i in range(num_channel):
-            real_band_data = real_target[:, :, band_range[0]:band_range[1], :]
-            pred_band_data = pred_meg_y[:, :, band_range[0]:band_range[1], :]
-
-            real_band_data = real_band_data.reshape(real_band_data.shape[0], real_band_data.shape[1], -1)
-            pred_band_data = pred_band_data.reshape(pred_band_data.shape[0], pred_band_data.shape[1], -1)
-
-            pearson_corr = np.corrcoef(real_band_data[:,i].reshape(-1), pred_band_data[:,i].reshape(-1))[0,1]
+            list_nmi = [0]
+            if nmi_compute:
+                # print('nmi_compute')
+                list_nmi = []
+                for sample in range(pred_band_data.shape[0]):
+                    nmi_val = normalized_mutual_information(real_band_data[sample,channel].numpy(), pred_band_data[sample,channel].numpy())
+                    list_nmi.append(nmi_val)
+            timefreq = real_band_data_resh.shape[-1]
+            pearson_corr_np = np.corrcoef(real_band_data_resh[:,channel].T, pred_band_data_resh[:,channel].T)
+            pearson_corr_np = np.diag(pearson_corr_np[0:timefreq, timefreq:timefreq*2]*np.eye(timefreq))
+            pearson_corr = pearson_corr_np.mean()
+            # pearson_corr = np.corrcoef(real_band_data[:,i].reshape(-1), pred_band_data[:,i].reshape(-1))[0,1]   --> tutto flat
             modified_r2 = np.abs(pearson_corr) * pearson_corr
-            mse = mean_squared_error(real_band_data[:,i], pred_band_data[:,i])
-            mae = mean_absolute_error(real_band_data[:,i], pred_band_data[:,i])
-            mae_norm = float(mae/abs(pred_band_data[:,i].mean()))
+            
+            mse = mean_squared_error(real_band_data_resh[:,channel], pred_band_data_resh[:,channel])
+            mae = mean_absolute_error(real_band_data_resh[:,channel], pred_band_data_resh[:,channel])
+            mae_norm = float(mae/abs(pred_band_data[:,channel].mean()))
 
             metrics_by_band.setdefault(band_name, []).append({
-                'channel': i,
+                'channel': channel,
                 'pearson_corr': pearson_corr,
                 'modified_r2': modified_r2,
                 'mse': mse,
                 'mae': mae,
                 'mae_norm': mae_norm,
+                'nmi': np.mean(list_nmi),
             })
 
     return metrics_by_band

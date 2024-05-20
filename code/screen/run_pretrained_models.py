@@ -1,6 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, cohen_kappa_score
 from sklearn.linear_model import LogisticRegression
@@ -28,7 +29,7 @@ from sklearn.linear_model import Ridge
 
 
 stimuli_feature = "text"    # audio or text
-subjects = ['02', '04', '05', '06', '08', '09', '10', '11']
+subjects = ['10', '11']
 tasks_with_sound_ids = {
             'lw1': lw1,
             'cable_spool_fort': cable_spool_fort,
@@ -127,10 +128,12 @@ if stimuli_feature == "text":
         tokenizer = AutoTokenizer.from_pretrained("gpt2")
         tokenizer.pad_token = tokenizer.eos_token
         inputs_tr = tokenizer(list(y_sent_train), padding=True, return_tensors="pt")
-        outputs_tr = model(**inputs_tr)
+        with torch.no_grad():
+            outputs_tr = model(**inputs_tr)
         last_hidden_states_tr = outputs_tr.last_hidden_state
         inputs_test = tokenizer(list(y_sent_test), padding=True, return_tensors="pt")
-        outputs_test = model(**inputs_test)
+        with torch.no_grad():
+            outputs_test = model(**inputs_test)
         last_hidden_states_test = outputs_test.last_hidden_state
         """
 

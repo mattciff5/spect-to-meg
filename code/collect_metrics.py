@@ -39,17 +39,19 @@ def get_correlation(meg_tensor_test, pred_meg_y):
     return pred_meg_y, real_target, correlations
 
 
-def get_topomap(raw, correlations, vlim, cmap='RdBu_r', sphere=0.13, extrapolate='local', size=8.5, label_to_set='Correlation'):
+def get_topomap(raw, correlations, vlim, cmap='RdBu_r', sphere=0.13, extrapolate='local', 
+                image_interp='cubic', threshold=None, size=8.5, label_to_set='Correlation'):
     meg_indices = mne.pick_types(raw.info, meg=True)
     meg_channel_positions = np.array([raw.info['chs'][i]['loc'][:2] for i in meg_indices])
     print('meg_channel_positions.shape: ', meg_channel_positions.shape)
-
     correlations = np.array(correlations).reshape(-1)
     print('correlations.shape: ', correlations.shape)
+    if threshold is not None:
+        correlations = np.where(correlations > threshold, correlations, np.nan)
     fig, ax = plt.subplots()
     topomap = mne.viz.plot_topomap(correlations, meg_channel_positions, ch_type='meg',
                                 names=raw.info['ch_names'], sphere=sphere,
-                                image_interp='cubic', extrapolate=extrapolate,
+                                image_interp=image_interp, extrapolate=extrapolate,
                                 border='mean', size=size, cmap=cmap, axes=ax, 
                                 vlim=vlim, show=False)
     cbar = plt.colorbar(topomap[0], ax=ax, fraction=0.02, pad=0.1)   

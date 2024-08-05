@@ -13,7 +13,7 @@ megsp_path = os.path.join(meg_path, 'collect_data/megsp')
 megsp_list = os.listdir(megsp_path)
 extr_path = meg_path + "/collect_data"
 subjects_metrics_null = {}
-model_list = ['ridge_text_gpt_']
+model_list = ['ridge_text_clip_']
 # model_list = ['ridge_text_clip_', 'ridge_text_gpt_', 'ridge_', 'ridge_w2v_']
 
 for model in model_list:
@@ -51,10 +51,10 @@ for model in model_list:
         for i in range(null_distr_iter):
             temp_list = distr_list[i]['complete']
             for j, h in enumerate(temp_list):
-                mod_r2_null[j,i] = h['modified_r2']
+                mod_r2_null[j,i] = h['pearson_corr']
         
         list_subj_null.append(mod_r2_null)
-    np.save('/data01/data/MEG/collect_data/results/null_distr/null_distr_'+model+'.npy', list_subj_null)
+    np.save('/data01/data/MEG/collect_data/results/null_distr/null_distr_pearson_'+model+'.npy', list_subj_null)
 
 
        

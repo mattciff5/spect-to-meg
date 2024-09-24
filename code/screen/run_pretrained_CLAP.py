@@ -14,7 +14,7 @@ import torchaudio
 
 
 stimuli_feature = "audio"    # audio or text
-subjects = ['01', '06', '07', '08', '09']
+subjects = ['01', '07', '08', '09']
 # subjects = ['01']
 tasks_with_sound_ids = {
             'lw1': lw1,

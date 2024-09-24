@@ -13,7 +13,7 @@ megsp_path = os.path.join(meg_path, 'collect_data/megsp')
 megsp_list = os.listdir(megsp_path)
 extr_path = meg_path + "/collect_data"
 subjects_metrics_null = {}
-model_list = ['ridge_text_clip_']
+model_list = ['ridge_w2v_']
 # model_list = ['ridge_text_clip_', 'ridge_text_gpt_', 'ridge_', 'ridge_w2v_']
 
 for model in model_list:
@@ -32,7 +32,7 @@ for model in model_list:
             meg_tensor_test = meg_tensor_test[19:-1]
 
         distr_list = []
-        null_distr_iter = 30
+        null_distr_iter = 100
         for trial in range(null_distr_iter):
             pred_meg_y = torch.load(os.path.join(subj_path, 'meg_prediction_'+model+subject+'.pt')) 
             pred_meg_y = pred_meg_y.permute(1, 0, 2)
@@ -54,7 +54,7 @@ for model in model_list:
                 mod_r2_null[j,i] = h['pearson_corr']
         
         list_subj_null.append(mod_r2_null)
-    np.save('/data01/data/MEG/collect_data/results/null_distr/null_distr_pearson_'+model+'.npy', list_subj_null)
+    np.save('/data01/data/MEG/collect_data/results/null_distr/null_distr_pc_100_'+model+'.npy', list_subj_null)
 
 
        

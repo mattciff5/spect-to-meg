@@ -11,7 +11,6 @@ from tqdm import tqdm
 
 shift_value = 1e13
 duration = 3   # seconds
-decim = 1
 n_fft = 512 
 act_subjects = 8
 num_models = 4
@@ -33,10 +32,17 @@ meg_path = '/data01/data/MEG'
 patient = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11']
 session = ['0', '1']
 task = {'lw1': 0.0, 'cable_spool_fort': 1.0, 'easy_money': 2.0, 'the_black_willow': 3.0}
+task_list = ['lw1', 'cable_spool_fort', 'easy_money', 'the_black_willow']
 lw1 = ['0.0', '1.0', '2.0', '3.0']
 cable_spool_fort = ['0.0', '1.0', '2.0', '3.0', '4.0', '5.0']
 easy_money = ['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0']
 the_black_willow = ['0.0', '1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0', '8.0', '9.0', '10.0', '11.0']
+tasks_with_sound_ids = {
+    'lw1': lw1,
+    'cable_spool_fort': cable_spool_fort,
+    'easy_money': easy_money,
+    'the_black_willow': the_black_willow
+}
 
 
 def get_bids_raw(meg_path, subject, session, task):
@@ -66,7 +72,7 @@ def get_meg_from_raw_epochs(epochs):
     return tensor_meg
 
 
-def get_epochs(raw, story_uid, sound_id):
+def get_epochs(raw, story_uid, sound_id, decim=1):
     meta = list()
     for annot in raw.annotations:
         d = eval(annot.pop("description"))

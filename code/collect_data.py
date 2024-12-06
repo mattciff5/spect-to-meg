@@ -11,10 +11,12 @@ from tqdm import tqdm
 
 shift_value = 1e13
 duration = 3   # seconds
-n_fft = 512 
+n_fft_meg = 512 
+hop_len_meg = n_fft_meg // 4  
+n_fft_speech = 8192 
+hop_len_speech = n_fft_speech // 4  
 act_subjects = 8
 num_models = 4
-hop_length = n_fft // 4  
 sampling_audio = 16000
 sampling_meg = 1000
 freq_cut = 30
@@ -109,11 +111,11 @@ def get_epochs(raw, story_uid, sound_id, decim=1):
 
 def get_meg_spectrogram(data_tensor):
     data_np = data_tensor.numpy()
-    n_frames = (1 + (data_np.shape[2] - n_fft) // hop_length) + n_fft // hop_length
-    spectrograms = np.zeros((data_np.shape[0], data_np.shape[1], n_fft // 2 + 1, n_frames))
+    n_frames = (1 + (data_np.shape[2] - n_fft_meg) // hop_len_meg) + n_fft_meg // hop_len_meg
+    spectrograms = np.zeros((data_np.shape[0], data_np.shape[1], n_fft_meg // 2 + 1, n_frames))
     for i in range(data_np.shape[0]): 
         for j in range(data_np.shape[1]): 
-            d = librosa.stft(data_np[i, j], n_fft=n_fft, hop_length=hop_length)
+            d = librosa.stft(data_np[i, j], n_fft=n_fft_meg, hop_length=hop_len_meg)
             spectrograms[i, j] = librosa.amplitude_to_db(np.abs(d), ref=np.max)
     spectrograms_tensor = torch.from_numpy(spectrograms)
     return spectrograms_tensor
@@ -121,8 +123,8 @@ def get_meg_spectrogram(data_tensor):
 
 def get_meg_spectrogram_ranged(data_tensor, f_min, f_max):
     data_np = data_tensor.numpy()
-    n_frames = (1 + (data_np.shape[2] - n_fft) // hop_length) + n_fft // hop_length
-    n_freq_bins = n_fft // 2 + 1
+    n_frames = (1 + (data_np.shape[2] - n_fft_meg) // hop_len_meg) + n_fft_meg // hop_len_meg
+    n_freq_bins = n_fft_meg // 2 + 1
     freqs = np.linspace(0, sampling_meg // 2, n_freq_bins)
     f_min_idx = np.searchsorted(freqs, f_min)
     f_max_idx = np.searchsorted(freqs, f_max, side='right')
@@ -130,24 +132,24 @@ def get_meg_spectrogram_ranged(data_tensor, f_min, f_max):
     spectrograms = np.zeros((data_np.shape[0], data_np.shape[1], selected_bins, n_frames))
     for i in range(data_np.shape[0]): 
         for j in range(data_np.shape[1]): 
-            d = librosa.stft(data_np[i, j], n_fft=n_fft, hop_length=hop_length)
+            d = librosa.stft(data_np[i, j], n_fft=n_fft_meg, hop_length=hop_len_meg)
             db_spectrogram = librosa.amplitude_to_db(np.abs(d), ref=np.max)
             spectrograms[i, j] = db_spectrogram[f_min_idx:f_max_idx]
     spectrograms_tensor = torch.from_numpy(spectrograms)
     return spectrograms_tensor
 
 
-def get_audio_spectrogram(audio_path, epochs):
+def get_audio_spectrogram(audio_path, epochs, basel_correct=0.21):
     data_audio_chunks = []
-    n_frames = (1 + ((sampling_audio * duration) - n_fft) // hop_length) + n_fft // hop_length
+    n_frames = (1 + ((sampling_audio * duration) - n_fft_speech) // hop_len_speech) + n_fft_speech // hop_len_speech
     epoch_spectr = get_meg_from_raw_epochs(epochs)
     for i in range(epoch_spectr.shape[0]):
         start = epochs[i]._metadata["start"].item()
         y, sr = librosa.load(audio_path, sr=sampling_audio, offset=start, duration=duration)
-        y_db = librosa.amplitude_to_db(librosa.stft(y, n_fft=n_fft, hop_length=hop_length), ref=np.max)
+        y_db = librosa.amplitude_to_db(librosa.stft(y, n_fft=n_fft_speech, hop_length=hop_len_speech), ref=np.max)
         if (y_db.shape[1] < n_frames):   
             # make padding         
-            pad_width = n_frames - y_db.shape[1]
+            pad_width = n_frames - y_db.shape[1]  # int(n_frames - y_db.shape[1])
             y_db = np.pad(y_db, ((0, 0), (0, pad_width)), mode='constant', constant_values=-80)
         data_audio_chunks.append(y_db)
     audio_tensor = torch.tensor(data_audio_chunks)
@@ -156,15 +158,15 @@ def get_audio_spectrogram(audio_path, epochs):
 
 def get_audio_deep_spectrogram(audio_path, epochs, set_extraction='mel', n_mels=128, n_mfcc=40):   # TODO: n_mels = 256 
     data_audio_chunks = []
-    n_frames = (1 + ((sampling_audio * duration) - n_fft) // hop_length) + n_fft // hop_length
+    n_frames = (1 + ((sampling_audio * duration) - n_fft_speech) // hop_len_speech) + n_fft_speech // hop_len_speech
     epoch_spectr = get_meg_from_raw_epochs(epochs)
     for i in range(epoch_spectr.shape[0]):
         start = epochs[i]._metadata["start"].item()
         y, sr = librosa.load(audio_path, sr=sampling_audio, offset=start, duration=duration) 
         if set_extraction == 'mel':
             # extract MEL spectrogram
-            mel_spectrogram = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft, 
-                                                            hop_length=hop_length, n_mels=n_mels)
+            mel_spectrogram = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft_speech, 
+                                                            hop_length=hop_len_speech, n_mels=n_mels)
             spectrogram_db = librosa.amplitude_to_db(mel_spectrogram, ref=np.min)
             if (spectrogram_db.shape[1] < n_frames):
                 # Make padding
@@ -172,8 +174,8 @@ def get_audio_deep_spectrogram(audio_path, epochs, set_extraction='mel', n_mels=
                 spectrogram_db = np.pad(spectrogram_db, ((0, 0), (0, pad_width)), mode='constant', constant_values=-80)
         else:
             # extract MFCC spectrogram
-            mfcc_spectrogram = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=n_mfcc, n_fft=n_fft, 
-                                                        hop_length=hop_length)
+            mfcc_spectrogram = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=n_mfcc, n_fft=n_fft_speech, 
+                                                        hop_length=hop_len_speech)
             spectrogram_db = mfcc_spectrogram
             if (spectrogram_db.shape[1] < n_frames):
                 # Make padding
@@ -185,7 +187,7 @@ def get_audio_deep_spectrogram(audio_path, epochs, set_extraction='mel', n_mels=
     return audio_tensor
 
 
-def plot_spectrogram(encode_spect, sr, sample, channel):
+def plot_spectrogram(encode_spect, sr, sample, channel, n_fft, hop_length):
     if (len(encode_spect.shape) == 4):
         time_extent = np.linspace(0, 3.21, encode_spect.shape[1])
         encode_spect =  encode_spect[sample][channel].numpy()

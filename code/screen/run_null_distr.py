@@ -13,7 +13,7 @@ megsp_path = os.path.join(meg_path, 'collect_data/megsp')
 megsp_list = os.listdir(megsp_path)
 extr_path = meg_path + "/collect_data"
 subjects_metrics_null = {}
-model_list = ['ridge_w2v_']
+model_list = ['ridge_']
 # model_list = ['ridge_text_clip_', 'ridge_text_gpt_', 'ridge_', 'ridge_w2v_']
 
 for model in model_list:
@@ -22,7 +22,10 @@ for model in model_list:
     for repo in tqdm(os.listdir(extr_path)[3:-3]):
         subject = repo[-2:]
         print('SOGGETTO: ', subject)
-        subj_path = extr_path + '/' + repo + '/'
+        if subject == '10':
+            break
+        # subj_path = extr_path + '/' + repo + '/'
+        subj_path = '/srv/nfs-data/sisko/matteoc/meg/audio_stft'
         megsp_list_session_0 = [f for f in megsp_list if f.startswith(subject) and f.split('_')[1] == '0']
         megsp_list_session_1 = [f for f in megsp_list if f.startswith(subject) and f.split('_')[1] == '1']
         meg_0_tensor_train, meg_0_tensor_valid, meg_0_tensor_test = get_splitted_tensor(megsp_list_session_0, megsp_path)
@@ -54,7 +57,7 @@ for model in model_list:
                 mod_r2_null[j,i] = h['pearson_corr']
         
         list_subj_null.append(mod_r2_null)
-    np.save('/data01/data/MEG/collect_data/results/null_distr/null_distr_pc_100_'+model+'.npy', list_subj_null)
+    np.save('/data01/data/MEG/collect_data/results/null_distr/null_distr_pc_100_'+model+'nfft.npy', list_subj_null)
 
 
        

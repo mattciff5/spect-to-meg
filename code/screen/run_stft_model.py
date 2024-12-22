@@ -20,7 +20,7 @@ audio_list = os.listdir(audio_path)
 
 path_to_save = '/srv/nfs-data/sisko/matteoc/meg/audio_stft'
 
-subjects = ['01','02','04','05','06','07']
+subjects = ['08','09']
 for select_subj in subjects:
     print('NUM_SUBJECT: ', select_subj)
     megsp_list_session_0 = [f for f in megsp_list if f.startswith(select_subj) and f.split('_')[1] == '0']
@@ -105,5 +105,6 @@ for select_subj in subjects:
 
     # save_mse = os.path.join(meg_path, 'collect_data/results_'+select_subj+'/meg_mse_ridge_'+select_subj+'.pt')
     # torch.save(torch.tensor(mse_scores), save_mse)
-    save_pred_target = os.path.join(path_to_save, 'results_'+select_subj+'/meg_prediction_ridge_'+select_subj+'.pt')
+    # save_pred_target = os.path.join(path_to_save, 'results_'+select_subj+'/meg_prediction_ridge_'+select_subj+'.pt')
+    save_pred_target = os.path.join(path_to_save, 'meg_prediction_ridge_'+select_subj+'.pt')
     torch.save(torch.tensor(pred_target), save_pred_target)
